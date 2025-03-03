@@ -8,17 +8,27 @@ import SwiftUI
 
 struct MatchListView: View {
     @StateObject private var viewModel = MatchCardViewModel()
-    
+    @State private var lastVisibleId: UUID? = nil // Track the last visible user ID
+
     var body: some View {
         NavigationView {
-            contentView
-                .navigationTitle("Matches")
-                .onAppear {
-                    viewModel.loadUsers(isInitialLoad: true)
-                }
+            ScrollViewReader { scrollViewProxy in
+                contentView
+                    .navigationTitle("Matches")
+                    .onAppear {
+                        viewModel.loadUsers(isInitialLoad: true)
+                    }
+                    .onChange(of: viewModel.users.last?.id) { newId in
+                        if let lastVisibleId = lastVisibleId {
+                            withAnimation {
+                                scrollViewProxy.scrollTo(lastVisibleId, anchor: .bottom)
+                            }
+                        }
+                    }
+            }
         }
     }
-    
+
     // Main content of the view
     private var contentView: some View {
         Group {
@@ -31,7 +41,7 @@ struct MatchListView: View {
             }
         }
     }
-    
+
     // Loading spinner for initial data load
     private var loadingView: some View {
         VStack {
@@ -41,7 +51,7 @@ struct MatchListView: View {
                 .foregroundColor(.gray)
         }
     }
-    
+
     // View to display when there are no users available
     private var emptyStateView: some View {
         VStack {
@@ -55,7 +65,7 @@ struct MatchListView: View {
                 .foregroundColor(.gray)
         }
     }
-    
+
     // Updated List of User Cards with Offline Support
     private var userListView: some View {
         ScrollView {
@@ -71,16 +81,16 @@ struct MatchListView: View {
                             viewModel.declineUser(user)
                         }
                     )
+                    .id(user.id) // Set the ID for scrolling
                     .onAppear {
-                        // Improved Pagination - Prevent Unnecessary Calls
+                        // Check if the current user is the last one in the list
                         if user == viewModel.users.last && !viewModel.isFetching {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                viewModel.loadUsers()
-                            }
+                            lastVisibleId = user.id // Update the last visible ID
+                            viewModel.loadUsers()
                         }
                     }
                 }
-                
+
                 if viewModel.isLoading {
                     ProgressView("Loading more users...")
                         .padding()

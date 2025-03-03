@@ -85,42 +85,47 @@ class MatchCardViewModel: ObservableObject {
     
 
     private func mergeAPIDataWithLocalData(_ fetchedUsers: [User]) {
-        let savedUsers = coreDataManager.fetchUsers()
-        let savedUsersDict = Dictionary(uniqueKeysWithValues: savedUsers.map { ($0.id, $0) })
+          let savedUsers = coreDataManager.fetchUsers()
+          let savedUsersDict = Dictionary(uniqueKeysWithValues: savedUsers.map { ($0.id, $0) })
 
-        var newUsers: [UserProfile] = []
+          var newUsers: [UserProfile] = []
 
-        for apiUser in fetchedUsers {
-            if let savedUser = savedUsersDict[apiUser.id] {
-                savedUser.status = savedUser.status
-                savedUser.name = "\(apiUser.name.first) \(apiUser.name.last)"
-                savedUser.age = Int16(apiUser.dob.age)
-                savedUser.imageUrl = apiUser.picture.large
+          for apiUser in fetchedUsers {
+              if let savedUser = savedUsersDict[apiUser.id] {
+                  // Update existing user data if necessary
+                  savedUser.status = savedUser.status
+                  savedUser.name = "\(apiUser.name.first) \(apiUser.name.last)"
+                  savedUser.age = Int16(apiUser.dob.age)
+                  savedUser.imageUrl = apiUser.picture.large
 
-                if savedUser.localImagePath == nil {
-                    saveImageToDisk(from: apiUser.picture.large, for: apiUser.id) { localPath in
-                        DispatchQueue.main.async {
-                            savedUser.localImagePath = localPath
-                        }
-                    }
-                }
+                  if savedUser.localImagePath == nil {
+                      saveImageToDisk(from: apiUser.picture.large, for: apiUser.id) { localPath in
+                          DispatchQueue.main.async {
+                              savedUser.localImagePath = localPath
+                              self.coreDataManager.saveContext()
+                          }
+                      }
+                  }
 
-                newUsers.append(savedUser)
-            } else {
-                let newUser = coreDataManager.createUserProfile(apiUser)
-                saveImageToDisk(from: apiUser.picture.large, for: apiUser.id) { localPath in
-                    DispatchQueue.main.async {
-                        newUser.localImagePath = localPath
-                    }
-                }
-                newUsers.append(newUser)
-            }
-        }
+                  newUsers.append(savedUser)
+              } else {
+                  // Create new user profile for newly fetched users
+                  let newUser = coreDataManager.createUserProfile(apiUser)
+                  saveImageToDisk(from: apiUser.picture.large, for: apiUser.id) { localPath in
+                      DispatchQueue.main.async {
+                          newUser.localImagePath = localPath
+                          self.coreDataManager.saveContext()
+                      }
+                  }
+                  newUsers.append(newUser)
+              }
+          }
 
-        DispatchQueue.main.async {
-            self.users = newUsers
-        }
-    }
+          // Append new users to the existing list
+          DispatchQueue.main.async {
+              self.users.append(contentsOf: newUsers)
+          }
+      }
 
     
     
